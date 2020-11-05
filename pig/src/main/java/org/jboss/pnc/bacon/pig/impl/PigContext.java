@@ -87,11 +87,15 @@ public class PigContext {
 
     private Map<String, Collection<String>> checksums;
 
-    public void initConfig(Path configDir, String targetPath, Optional<String> releaseStorageUrl) {
+    public void initConfig(
+            Path configDir,
+            String targetPath,
+            Optional<String> releaseStorageUrl,
+            Map<String, String> overrides) {
         File configFile = configDir.resolve("build-config.yaml").toFile();
         if (configFile.exists()) {
             try (FileInputStream configStream = new FileInputStream(configFile)) {
-                PigConfiguration loadedConfig = PigConfiguration.load(configStream);
+                PigConfiguration loadedConfig = PigConfiguration.load(configStream, overrides);
                 setPigConfiguration(loadedConfig, targetPath, releaseStorageUrl);
             } catch (IOException e) {
                 throw new RuntimeException("Failed to read config file: " + configFile.getAbsolutePath(), e);
@@ -186,14 +190,29 @@ public class PigContext {
             boolean clean,
             Path configDir,
             String targetPath,
-            Optional<String> releaseStorageUrl) {
+            Optional<String> releaseStorageUrl,
+            Map<String, String> overrides) {
         instance = readContext(clean, configDir);
-        instance.initConfig(configDir, targetPath, releaseStorageUrl);
+        instance.initConfig(configDir, targetPath, releaseStorageUrl, overrides);
         return instance;
     }
 
     private static PigContext readContext(boolean clean, Path configDir) {
-        String sha = hashDirectory(configDir);
+        String sha = hashDirectory(
+                configDir,
+                path -> {
+                    // normalize to remove any redundancies (unnecessary './' or '../' in the path)
+                    Path tempPath = path.normalize();
+                    // we ignore the top-level .bacon/pig-context.json and the content from the top-level target folder
+                    // if
+                    // present
+                    // They shouldn't be part of the hash generation since their content will change constantly but
+                    // shouldn't
+                    // contribute to the hash of the directory since their content doesn't affect the integrity of the
+                    // context
+                    return tempPath.startsWith(Paths.get(".bacon", "pig-context.json"))
+                            || tempPath.startsWith(Paths.get("target"));
+                });
 
         PigContext result;
         String ctxLocationEnv = System.getenv(PIG_CONTEXT_DIR);

@@ -44,11 +44,6 @@ public class RepoGenerationData extends GenerationData<RepoGenerationStrategy> {
     private boolean includeJavadoc;
     private boolean includeLicenses;
     private boolean includeMavenMetadata;
-    private boolean includeOffliner;
-    /**
-     * File name of the offline manifest. Default - offline-manifest.txt
-     */
-    private String offlineManifestFilename = "offline-manifest.txt";
     private String buildScript;
     private Set<String> ignored = new HashSet<>();
     private String additionalRepo;
