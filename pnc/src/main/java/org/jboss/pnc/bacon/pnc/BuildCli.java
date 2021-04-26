@@ -93,7 +93,9 @@ public class BuildCli {
         private String rebuildMode;
         @Option(names = "--keep-pod-on-failure", description = "Keep the builder pod online after the build fails.")
         private boolean keepPodOnFailure = false;
-        @Option(names = "--timestamp-alignment", description = "Do timestamp alignment with temprary build.")
+        @Option(
+                names = "--timestamp-alignment",
+                description = "NOT SUPPORTED - Do timestamp alignment with temporary build.")
         private boolean timestampAlignment = false;
         @Option(names = "--temporary-build", description = "Perform a temporary build.")
         private boolean temporaryBuild = false;
@@ -119,10 +121,13 @@ public class BuildCli {
             if (rebuildMode == null) {
                 rebuildMode = RebuildMode.IMPLICIT_DEPENDENCY_CHECK.name();
             }
+            if (timestampAlignment) {
+                log.warn(
+                        "Temporary builds with timestamp alignment are not supported, running temporary builds instead...");
+            }
             ParameterChecker.checkRebuildModeOption(rebuildMode);
             buildParams.setRebuildMode(RebuildMode.valueOf(rebuildMode));
             buildParams.setKeepPodOnFailure(keepPodOnFailure);
-            buildParams.setTimestampAlignment(timestampAlignment);
             buildParams.setTemporaryBuild(temporaryBuild);
             buildParams.setBuildDependencies(!noBuildDependencies);
 
