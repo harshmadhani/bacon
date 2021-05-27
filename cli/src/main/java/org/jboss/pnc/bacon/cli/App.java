@@ -18,6 +18,10 @@
 package org.jboss.pnc.bacon.cli;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.LoggerContext;
+import ch.qos.logback.classic.encoder.PatternLayoutEncoder;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.ConsoleAppender;
 import lombok.extern.slf4j.Slf4j;
 import org.fusesource.jansi.AnsiConsole;
 import org.jboss.bacon.da.Da;
@@ -44,6 +48,7 @@ import org.jline.reader.impl.DefaultParser;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.widget.TailTipWidgets;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.IExecutionExceptionHandler;
@@ -100,6 +105,17 @@ public class App {
         }
     }
 
+    /**
+     * Make logback quiet if quiet flag is set
+     */
+    @Option(names = { "-q", "--quiet" }, description = "Silent output", scope = INHERIT)
+    public static void setQuietIfPresent(boolean quiet) {
+
+        if (quiet) {
+            ObjectHelper.setRootLoggingLevel(ObjectHelper.LOG_LEVEL_SILENT);
+        }
+    }
+
     @Option(names = "--profile", description = "PNC Configuration profile", scope = INHERIT)
     public void setProfile(String profile) {
         this.profile = profile;
@@ -112,6 +128,15 @@ public class App {
     public void setConfigurationFileLocation(String configPath) {
         this.configPath = configPath;
     }
+
+    /**
+     * Disable color in Picocli output
+     */
+    @Option(
+            names = { "--no-color" },
+            description = "Disable color output. Useful when running in a non-ANSI environment",
+            scope = INHERIT)
+    private boolean nocolor;
 
     public int run(String[] args) {
 
@@ -185,6 +210,38 @@ public class App {
     }
 
     private void init() {
+        /*
+         * https://no-color.org/ If NO_COLOR env variable is present, regardless of its value, prevents the addition of
+         * ANSI color
+         */
+        if (System.getenv().containsKey("NO_COLOR") || nocolor) {
+            log.debug("Reconfiguring logger for NO_COLOR");
+
+            // Documentation: https://picocli.info/#_forcing_ansi_onoff
+            System.setProperty("picocli.ansi", "false");
+
+            // Now reconfigure logback to remove any highlighting.
+            final ch.qos.logback.classic.Logger root = (ch.qos.logback.classic.Logger) LoggerFactory
+                    .getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+
+            root.detachAppender("STDERR");
+            LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+
+            PatternLayoutEncoder ple = new PatternLayoutEncoder();
+            ple.setPattern("[%-5level] - %msg%n");
+            ple.setContext(loggerContext);
+            ple.start();
+
+            ConsoleAppender<ILoggingEvent> consoleAppender = new ConsoleAppender<>();
+            consoleAppender.setName("STDERR");
+            consoleAppender.setTarget("System.err");
+            consoleAppender.setContext(loggerContext);
+            consoleAppender.setEncoder(ple);
+            consoleAppender.start();
+
+            root.addAppender(consoleAppender);
+        }
+
         if (configPath != null) {
             setConfigLocation(configPath, "flag");
         } else if (System.getenv(Constant.CONFIG_ENV) != null) {

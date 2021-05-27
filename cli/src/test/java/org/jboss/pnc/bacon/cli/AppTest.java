@@ -1,15 +1,20 @@
 package org.jboss.pnc.bacon.cli;
 
 import ch.qos.logback.classic.Level;
+import ch.qos.logback.core.pattern.color.ANSIConstants;
 import org.apache.commons.io.FilenameUtils;
 import org.jboss.pnc.bacon.common.ObjectHelper;
 import org.junit.jupiter.api.Test;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 import static com.github.stefanbirkner.systemlambda.SystemLambda.restoreSystemProperties;
 import static com.github.stefanbirkner.systemlambda.SystemLambda.tapSystemErr;
 import static com.github.stefanbirkner.systemlambda.SystemLambda.tapSystemOut;
+import static com.github.stefanbirkner.systemlambda.SystemLambda.withEnvironmentVariable;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -24,7 +29,56 @@ class AppTest {
             System.setProperty("picocli.ansi", "false");
             app.run(new String[] { "-h" });
             String text = tapSystemOut(() -> assertEquals(0, app.run(new String[] { "-h" })));
-            assertThat(text).contains("Usage: bacon [-hovV] [-p=<configurationFileLocation>] [--profile=<profile>]");
+            assertThat(text).contains(
+                    "Usage: bacon [-hoqvV] [--no-color] [-p=<configurationFileLocation>]",
+                    "[--profile=<profile>]");
+        });
+    }
+
+    @Test
+    void testNoColor1() throws Exception {
+        File pncClasses = new File(App.class.getClassLoader().getResource("").getFile());
+        File configYaml = new File(pncClasses.getParentFile().getParentFile().getParentFile(), PNC_TEST_CLASSES);
+        App app = new App();
+        withEnvironmentVariable("NO_COLOR", "true").execute(() -> {
+            String text = tapSystemErr(
+                    () -> assertEquals(
+                            1,
+                            app.run(
+                                    new String[] {
+                                            "-p",
+                                            configYaml.toString(),
+                                            "-v",
+                                            "pnc",
+                                            "-o",
+                                            "build",
+                                            "get",
+                                            "0" })));
+            assertThat(text).contains("Reconfiguring logger for NO_COLOR");
+            // The first two lines will have the DEBUG with colour codes until it is reset
+            assertThat(text).contains(ANSIConstants.ESC_START);
+            List<String> lines = new ArrayList<>(Arrays.asList(text.split(System.getProperty("line.separator"))));
+            // Avoid issues debugging in IntelliJ due to classpath loading.
+            lines.removeIf(
+                    s -> s.contains(
+                            "Unable to retrieve manifest for class org.jboss.pnc.bacon.common.cli.VersionProvider as location is a directory not a jar"));
+            assertThat(lines.subList(2, 10).toString()).doesNotContain(ANSIConstants.ESC_START);
+        });
+    }
+
+    @Test
+    void testNoColor2() throws Exception {
+        File pncClasses = new File(App.class.getClassLoader().getResource("").getFile());
+        File configYaml = new File(pncClasses.getParentFile().getParentFile().getParentFile(), PNC_TEST_CLASSES);
+        App app = new App();
+
+        withEnvironmentVariable("NO_COLOR", "true").execute(() -> {
+            String text = tapSystemErr(
+                    () -> assertEquals(
+                            1,
+                            app.run(new String[] { "-p", configYaml.toString(), "pnc", "-o", "build", "get", "0" })));
+            assertThat(text).doesNotContain(ANSIConstants.ESC_START);
+            assertThat(System.getProperty("picocli.ansi")).contains("false");
         });
     }
 
@@ -71,6 +125,9 @@ class AppTest {
                         new App().run(
                                 new String[] { "-p", configYaml.toString(), "-v", "pnc", "-o", "build", "get", "0" })));
         assertThat(text).contains("JSON command is enabled: true");
+        assertThat(text).contains(ANSIConstants.ESC_START);
+        assertThat(Arrays.asList(text.split(System.getProperty("line.separator"))).subList(2, 10).toString())
+                .contains(ANSIConstants.ESC_START);
     }
 
     @Test
@@ -193,15 +250,18 @@ class AppTest {
                                             "-h" })));
 
             String expected = String.format(
-                    "Usage: bacon pnc admin maintenance-mode activate [-hovV]%n"
+                    "Usage: bacon pnc admin maintenance-mode activate [-hoqvV] [--no-color]%n"
                             + "       [-p=<configurationFileLocation>] [--profile=<profile>] <reason>%n"
                             + "This will disable any new builds from being accepted%n"
                             + "      <reason>              Reason%n"
                             + "  -h, --help                Show this help message and exit.%n"
+                            + "      --no-color            Disable color output. Useful when running in a%n"
+                            + "                              non-ANSI environment%n"
                             + "  -o, --jsonOutput          use json for output (default to yaml)%n"
                             + "  -p, --configPath=<configurationFileLocation>%n"
                             + "                            Path to PNC configuration folder%n"
                             + "      --profile=<profile>   PNC Configuration profile%n"
+                            + "  -q, --quiet               Silent output%n"
                             + "  -v, --verbose             Verbose output%n"
                             + "  -V, --version             Print version information and exit.%n" + "%n" + "Example:%n"
                             + "$ bacon pnc admin maintenance-mode activate \"Switching to maintenance mode for%n"

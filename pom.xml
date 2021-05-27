@@ -76,12 +76,12 @@
         <compiler.plugin.version>3.8.1</compiler.plugin.version>
         <jackson.version>2.12.3</jackson.version>
         <jaxb.version>2.2.11</jaxb.version>
-        <junit.version>5.7.1</junit.version>
+        <junit.version>5.7.2</junit.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
         <picocli.version>4.6.1</picocli.version>
-        <pme.version>4.2</pme.version>
+        <pme.version>4.3</pme.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <tagSuffix />
@@ -143,12 +143,12 @@
             <dependency>
                 <groupId>org.jboss.pnc</groupId>
                 <artifactId>rest-client</artifactId>
-                <version>2.0.3</version>
+                <version>2.1.0-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>org.jboss.pnc</groupId>
                 <artifactId>dto</artifactId>
-                <version>2.0.3</version>
+                <version>2.1.0-SNAPSHOT</version>
             </dependency>
             <dependency>
                 <groupId>info.picocli</groupId>
@@ -163,18 +163,18 @@
             <dependency>
                 <groupId>org.jline</groupId>
                 <artifactId>jline</artifactId>
-                <version>3.19.0</version>
+                <version>3.20.0</version>
             </dependency>
             <dependency>
                 <groupId>org.jline</groupId>
                 <artifactId>jline-console</artifactId>
-                <version>3.19.0</version>
+                <version>3.20.0</version>
             </dependency>
             <!-- I need this, otherwise the snowdrop dependency overrides the version and it messes things up -->
             <dependency>
                 <groupId>org.jboss.resteasy</groupId>
                 <artifactId>resteasy-jaxrs</artifactId>
-                <version>3.12.1.Final</version>
+                <version>3.14.0.Final</version>
             </dependency>
             <dependency>
                 <groupId>org.jboss.resteasy</groupId>
@@ -221,7 +221,7 @@
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpclient</artifactId>
-                <version>4.5.12</version>
+                <version>4.5.13</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
@@ -231,7 +231,7 @@
             <dependency>
                 <groupId>org.apache.httpcomponents</groupId>
                 <artifactId>httpmime</artifactId>
-                <version>4.5.12</version>
+                <version>4.5.13</version>
             </dependency>
             <dependency>
                 <groupId>org.json</groupId>
@@ -290,7 +290,7 @@
             <dependency>
                 <groupId>org.eclipse.jgit</groupId>
                 <artifactId>org.eclipse.jgit</artifactId>
-                <version>5.11.0.202103091610-r</version>
+                <version>5.11.1.202105131744-r</version>
             </dependency>
             <dependency>
                 <groupId>me.snowdrop</groupId>
@@ -420,7 +420,7 @@
             <dependency>
                 <groupId>org.mockito</groupId>
                 <artifactId>mockito-inline</artifactId>
-                <version>3.9.0</version>
+                <version>3.10.0</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -440,7 +440,7 @@
             <dependency>
                 <groupId>com.github.tomakehurst</groupId>
                 <artifactId>wiremock-jre8</artifactId>
-                <version>2.27.2</version>
+                <version>2.28.0</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -574,7 +574,7 @@
             <plugin>
                 <groupId>net.revelc.code</groupId>
                 <artifactId>impsort-maven-plugin</artifactId>
-                <version>1.6.0</version>
+                <version>1.6.2</version>
                 <configuration>
                     <groups>*,javax.,java.</groups>
                     <lineEnding>LF</lineEnding>
@@ -651,7 +651,7 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.6</version>
+                <version>0.8.7</version>
                 <executions>
                     <execution>
                         <goals>
@@ -691,7 +691,7 @@
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
                         <artifactId>maven-gpg-plugin</artifactId>
-                        <version>1.6</version>
+                        <version>3.0.1</version>
                         <executions>
                             <execution>
                                 <id>sign-artifacts</id>
