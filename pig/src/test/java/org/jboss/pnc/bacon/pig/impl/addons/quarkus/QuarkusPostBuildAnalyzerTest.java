@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -18,11 +19,12 @@ public class QuarkusPostBuildAnalyzerTest {
 
     @Test
     public void analyzePostBuildDeps() throws IOException {
+        File extrasPath = Files.createTempDirectory("extrasPath").toFile();
         QuarkusPostBuildAnalyzer quarkusPostBuildAnalyzer = new QuarkusPostBuildAnalyzer(
                 preConfig(),
                 null,
                 "/test-release-path",
-                "/test-extras-path");
+                extrasPath.getAbsolutePath());
         wireMockServer.start();
         stubFor(
                 get(urlEqualTo("/quarkus/?C=M;O=D")).willReturn(
@@ -72,7 +74,7 @@ public class QuarkusPostBuildAnalyzerTest {
                                 .withBodyFile("quarkus-1.0.0-licenses.zip")));
         quarkusPostBuildAnalyzer.trigger();
         wireMockServer.stop();
-        if (!verifyResults()) {
+        if (!verifyResults(extrasPath.getPath())) {
             throw new FatalException("The quarkus post build analyzer addon is not working correctly");
         }
     }
@@ -98,10 +100,10 @@ public class QuarkusPostBuildAnalyzerTest {
         return config;
     }
 
-    private boolean verifyResults() throws IOException {
+    private boolean verifyResults(String extrasPath) throws IOException {
         File expectedResult = new File(
                 getClass().getClassLoader().getResource("__files/expectedPostBuildInfo.txt").getFile());
-        File actualResult = new File("post-build-info.txt");
+        File actualResult = new File(extrasPath, "post-build-info.txt");
         return FileUtils.contentEquals(expectedResult, actualResult);
     }
 }

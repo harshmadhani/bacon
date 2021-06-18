@@ -20,8 +20,11 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.jboss.pnc.bacon.pig.impl.utils.FileUtils.mkTempDir;
 
 /**
  * @author Harsh Madhani<harshmadhani@gmail.com> Date: 06-August-2020
@@ -40,7 +43,7 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
         super(pigConfiguration, builds, releasePath, extrasPath);
     }
 
-    private static void postBuildCheck(String stagingPath, String productName) {
+    private static void postBuildCheck(String stagingPath, String productName, String extrasPath) {
         String stagingPathToProduct = stagingPath + productName + "/";
         List<String> fileContent = new ArrayList<>();
         try {
@@ -67,7 +70,7 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
                             "extras/nonexistent-redhat-deps.txt",
                             "nonexistent-redhat-deps"));
             fileContent.add(diffLicenseXml(latest_build_path, old_build_path));
-            Files.write(Paths.get("post-build-info.txt"), fileContent, StandardCharsets.UTF_8);
+            Files.write(Paths.get(extrasPath, "post-build-info.txt"), fileContent, StandardOpenOption.CREATE);
         } catch (IOException | URISyntaxException e) {
             log.error("Error during post build check", e);
         }
@@ -83,7 +86,7 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
         log.info("releasePath: {}, extrasPath: {}, config: {}", releasePath, extrasPath, pigConfiguration);
         String stagingPath = (String) getAddOnConfiguration().get("stagingPath");
         String productName = (String) getAddOnConfiguration().get("productName");
-        postBuildCheck(stagingPath, productName);
+        postBuildCheck(stagingPath, productName, extrasPath);
     }
 
     private static String diffTextFiles(
@@ -93,8 +96,9 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
             String deliverableType) throws IOException, URISyntaxException {
         String latestFilePath = latestBuildPath + filePath;
         String oldFilePath = oldBuildPath + filePath;
-        File latestBuildFile = new File("latest_" + deliverableType + ".txt");
-        File oldBuildFile = new File("old_" + deliverableType + ".txt");
+        File textDir = mkTempDir("textDir");
+        File latestBuildFile = new File(textDir, "latest_" + deliverableType + ".txt");
+        File oldBuildFile = new File(textDir, "old_" + deliverableType + ".txt");
 
         FileDownloadUtils.downloadTo(new URI(latestFilePath), latestBuildFile);
         FileDownloadUtils.downloadTo(new URI(oldFilePath), oldBuildFile);
@@ -114,15 +118,19 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
 
     private static List<String> diffDepsCsv(String latest_build_path, String old_build_path)
             throws URISyntaxException, IOException {
+        File csvDir = mkTempDir("csvDir");
         List<String> diff = new ArrayList<>();
         String communityDependenciesPath = "extras/community-dependencies.csv";
-        FileDownloadUtils
-                .downloadTo(new URI(latest_build_path + communityDependenciesPath), new File("new_dependencies.csv"));
-        FileDownloadUtils
-                .downloadTo(new URI(old_build_path + communityDependenciesPath), new File("old_dependencies.csv"));
-
-        Set<String> oldDependencies = CSVUtils.columnValues("Community dependencies", "new_dependencies.csv", ';');
-        Set<String> newDependencies = CSVUtils.columnValues("Community dependencies", "old_dependencies.csv", ';');
+        FileDownloadUtils.downloadTo(
+                new URI(latest_build_path + communityDependenciesPath),
+                new File(csvDir, "new_dependencies.csv"));
+        FileDownloadUtils.downloadTo(
+                new URI(old_build_path + communityDependenciesPath),
+                new File(csvDir, "old_dependencies.csv"));
+        Set<String> oldDependencies = CSVUtils
+                .columnValues("Community dependencies", csvDir.getPath().concat("/new_dependencies.csv"), ';');
+        Set<String> newDependencies = CSVUtils
+                .columnValues("Community dependencies", csvDir.getPath().concat("/old_dependencies.csv"), ';');
 
         String newBuildInfo = "Community Dependencies present in new build which were not present in old build are "
                 + CollectionUtils.subtract(newDependencies, oldDependencies);
@@ -137,8 +145,9 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
 
     private static String diffLicenseXml(String latest_build_path, String old_build_path)
             throws IOException, URISyntaxException {
-        File latestzip = new File("latest.zip");
-        File oldZip = new File("old.zip");
+        File licenseDir = mkTempDir("licenseDir");
+        File latestzip = new File(licenseDir, "latest.zip");
+        File oldZip = new File(licenseDir, "old.zip");
         Document document = Jsoup.connect(latest_build_path).get();
         String latestlicensezip = latest_build_path
                 + document.select("a[href~=license]").first().select("a[href]").text();
@@ -146,14 +155,20 @@ public class QuarkusPostBuildAnalyzer extends AddOn {
         String oldlicensezip = old_build_path + document.select("a[href~=license]").first().select("a[href]").text();
         FileDownloadUtils.downloadTo(new URI(latestlicensezip), latestzip);
         FileDownloadUtils.downloadTo(new URI(oldlicensezip), oldZip);
-        org.jboss.pnc.bacon.pig.impl.utils.FileUtils.getFileFromZip("latest.zip", "licenses.xml", "new_license.xml");
-        org.jboss.pnc.bacon.pig.impl.utils.FileUtils.getFileFromZip("old.zip", "licenses.xml", "old_license.xml");
+        org.jboss.pnc.bacon.pig.impl.utils.FileUtils.getFileFromZip(
+                licenseDir.getPath().concat("/latest.zip"),
+                "licenses.xml",
+                licenseDir.getPath().concat("/new_license.xml"));
+        org.jboss.pnc.bacon.pig.impl.utils.FileUtils.getFileFromZip(
+                licenseDir.getPath().concat("/old.zip"),
+                "licenses.xml",
+                licenseDir.getPath().concat("/old_license.xml"));
 
-        Set<String> newXml = XmlUtils.listNodes(new File("new_license.xml"), "//license/name")
+        Set<String> newXml = XmlUtils.listNodes(new File(licenseDir, "new_license.xml"), "//license/name")
                 .stream()
                 .map(dep -> dep.getTextContent())
                 .collect(Collectors.toSet());
-        Set<String> oldXml = XmlUtils.listNodes(new File("old_license.xml"), "//license/name")
+        Set<String> oldXml = XmlUtils.listNodes(new File(licenseDir, "old_license.xml"), "//license/name")
                 .stream()
                 .map(dep -> dep.getTextContent())
                 .collect(Collectors.toSet());
