@@ -30,7 +30,7 @@
 
     <groupId>org.jboss.pnc.bacon</groupId>
     <artifactId>parent</artifactId>
-    <version>2.1.9-SNAPSHOT</version>
+    <version>2.1.10-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <name>bacon</name>
@@ -74,18 +74,19 @@
 
     <properties>
         <compiler.plugin.version>3.8.1</compiler.plugin.version>
-        <jackson.version>2.12.3</jackson.version>
+        <jackson.version>2.12.4</jackson.version>
         <jaxb.version>2.2.11</jaxb.version>
         <junit.version>5.7.2</junit.version>
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
 
         <picocli.version>4.6.1</picocli.version>
-        <pme.version>4.3</pme.version>
+        <pme.version>4.4</pme.version>
 
-        <pnc.version>2.1.0-SNAPSHOT</pnc.version>
+        <pnc.version>2.1.1</pnc.version>
 
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <quarkus.resolver.version>2.1.0.Final</quarkus.resolver.version>
         <tagSuffix />
     </properties>
 
@@ -138,7 +139,7 @@
             <dependency>
                 <groupId>org.jboss.da</groupId>
                 <artifactId>reports-model</artifactId>
-                <version>2.1.0.Api-2</version>
+                <version>2.1.1</version>
             </dependency>
 
             <!-- pnc client -->
@@ -193,13 +194,13 @@
             <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-core</artifactId>
-                <version>1.2.3</version>
+                <version>1.2.4</version>
             </dependency>
 
             <dependency>
                 <groupId>ch.qos.logback</groupId>
                 <artifactId>logback-classic</artifactId>
-                <version>1.2.3</version>
+                <version>1.2.5</version>
             </dependency>
 
             <dependency>
@@ -277,7 +278,7 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-csv</artifactId>
-                <version>1.8</version>
+                <version>1.9.0</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.commons</groupId>
@@ -297,7 +298,7 @@
             <dependency>
                 <groupId>me.snowdrop</groupId>
                 <artifactId>licenses-generator</artifactId>
-                <version>1.0.5</version>
+                <version>1.2.0</version>
             </dependency>
             <dependency>
                 <groupId>org.jboss.pnc.build.finder</groupId>
@@ -324,12 +325,12 @@
             <dependency>
                 <groupId>org.apache.commons</groupId>
                 <artifactId>commons-compress</artifactId>
-                <version>1.20</version>
+                <version>1.21</version>
             </dependency>
             <dependency>
                 <groupId>org.apache.ant</groupId>
                 <artifactId>ant</artifactId>
-                <version>1.10.10</version>
+                <version>1.10.11</version>
             </dependency>
             <dependency>
                 <groupId>org.freemarker</groupId>
@@ -387,6 +388,24 @@
                 <artifactId>jaxb-core</artifactId>
                 <version>${jaxb.version}</version>
             </dependency>
+
+            <!-- Quarkus bootsrap maven resolver   -->
+            <dependency>
+                <groupId>io.quarkus</groupId>
+                <artifactId>quarkus-bootstrap-maven-resolver</artifactId>
+                <version>${quarkus.resolver.version}</version>
+                <exclusions>
+                    <exclusion>
+                        <groupId>org.jboss.slf4j</groupId>
+                        <artifactId>slf4j-jboss-logmanager</artifactId>
+                    </exclusion>
+                </exclusions>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.sisu</groupId>
+                <artifactId>org.eclipse.sisu.inject</artifactId>
+                <version>0.3.4</version>
+            </dependency>
             <dependency>
                 <groupId>org.projectlombok</groupId>
                 <artifactId>lombok</artifactId>
@@ -442,7 +461,7 @@
             <dependency>
                 <groupId>com.github.tomakehurst</groupId>
                 <artifactId>wiremock-jre8</artifactId>
-                <version>2.28.1</version>
+                <version>2.29.1</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
@@ -595,7 +614,7 @@
             <plugin>
                 <groupId>net.revelc.code.formatter</groupId>
                 <artifactId>formatter-maven-plugin</artifactId>
-                <version>2.15.0</version>
+                <version>2.16.0</version>
                 <configuration>
                     <configFile>../eclipse-codeStyle.xml</configFile>
                     <lineEnding>LF</lineEnding>
