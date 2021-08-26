@@ -1,10 +1,10 @@
 package org.jboss.pnc.bacon.auth;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.mashape.unirest.http.HttpResponse;
-import com.mashape.unirest.http.ObjectMapper;
-import com.mashape.unirest.http.Unirest;
-import com.mashape.unirest.http.exceptions.UnirestException;
+import kong.unirest.HttpResponse;
+import kong.unirest.MultipartBody;
+import kong.unirest.Unirest;
+import kong.unirest.UnirestException;
+import kong.unirest.jackson.JacksonObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.jboss.pnc.bacon.auth.model.CacheFile;
 import org.jboss.pnc.bacon.auth.model.Credential;
@@ -13,7 +13,6 @@ import org.jboss.pnc.bacon.auth.spi.KeycloakClient;
 import org.jboss.pnc.bacon.common.exception.FatalException;
 
 import java.io.Console;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -23,33 +22,11 @@ import java.util.Optional;
 @Slf4j
 public class DirectKeycloakClientImpl implements KeycloakClient {
 
+    private static final int MAX_RETRIES = 10;
+
     static {
-        setupUnirest();
-    }
-
-    private static void setupUnirest() {
-        // Only one time
-        Unirest.setObjectMapper(new ObjectMapper() {
-            private com.fasterxml.jackson.databind.ObjectMapper jacksonObjectMapper = new com.fasterxml.jackson.databind.ObjectMapper();
-
-            @Override
-            public <T> T readValue(String value, Class<T> valueType) {
-                try {
-                    return jacksonObjectMapper.readValue(value, valueType);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-
-            @Override
-            public String writeValue(Object value) {
-                try {
-                    return jacksonObjectMapper.writeValueAsString(value);
-                } catch (JsonProcessingException e) {
-                    throw new RuntimeException(e);
-                }
-            }
-        });
+        // Configure Unirest ObjectMapper
+        Unirest.config().setObjectMapper(new JacksonObjectMapper());
     }
 
     @Override
@@ -63,7 +40,7 @@ public class DirectKeycloakClientImpl implements KeycloakClient {
             Credential cred = cachedCredential.get();
             if (cred.isValid()) {
                 log.debug("Using cached credential details");
-                Credential refreshed = null;
+                Credential refreshed;
                 try {
                     refreshed = refreshCredentialIfNeededAndReturnNewCredential(keycloakBaseUrl, realm, username, cred);
                 } catch (UnirestException e) {
@@ -76,8 +53,8 @@ public class DirectKeycloakClientImpl implements KeycloakClient {
                     /*
                      * This section handles the following case:
                      *
-                     * When we refresh an access token, we usually also get a new refresh token. However the lifetime of
-                     * the new refresh token has the same expiry date as the original refresh token.
+                     * When we refresh an access token, we usually also get a new refresh token. However, the lifetime
+                     * of the new refresh token has the same expiry date as the original refresh token.
                      *
                      * Even when we get a new access token with a refresh token, if the particular refresh token
                      * lifetime is less than the normal lifetime of an access token, the new access token will get the
@@ -100,14 +77,13 @@ public class DirectKeycloakClientImpl implements KeycloakClient {
         try {
             log.debug("Getting token via username/password");
 
-            HttpResponse<KeycloakResponse> postResponse = Unirest.post(keycloakEndpoint)
+            MultipartBody body = Unirest.post(keycloakEndpoint)
                     .field("grant_type", "password")
                     .field("client_id", client)
                     .field("username", username)
-                    .field("password", askForPassword())
-                    .asObject(KeycloakResponse.class);
+                    .field("password", askForPassword());
 
-            KeycloakResponse response = postResponse.getBody();
+            KeycloakResponse response = getKeycloakResponseWithRetries(body);
             Instant now = Instant.now();
 
             Credential credential = Credential.builder()
@@ -141,13 +117,12 @@ public class DirectKeycloakClientImpl implements KeycloakClient {
 
             log.debug("Getting token via clientServiceAccountUsername / secret");
 
-            HttpResponse<KeycloakResponse> postResponse = Unirest.post(keycloakEndpoint)
+            MultipartBody body = Unirest.post(keycloakEndpoint)
                     .field("grant_type", "client_credentials")
                     .field("client_id", serviceAccountUsername)
-                    .field("client_secret", secret)
-                    .asObject(KeycloakResponse.class);
+                    .field("client_secret", secret);
 
-            KeycloakResponse response = postResponse.getBody();
+            KeycloakResponse response = getKeycloakResponseWithRetries(body);
             Instant now = Instant.now();
 
             return Credential.builder()
@@ -167,13 +142,12 @@ public class DirectKeycloakClientImpl implements KeycloakClient {
 
     private Credential refreshToken(Credential credential) throws UnirestException {
         String keycloakEndpoint = keycloakEndpoint(credential.getKeycloakBaseUrl(), credential.getRealm());
-        HttpResponse<KeycloakResponse> postResponse = Unirest.post(keycloakEndpoint)
+        MultipartBody body = Unirest.post(keycloakEndpoint)
                 .field("grant_type", "refresh_token")
                 .field("client_id", credential.getClient())
-                .field("refresh_token", credential.getRefreshToken())
-                .asObject(KeycloakResponse.class);
+                .field("refresh_token", credential.getRefreshToken());
 
-        KeycloakResponse response = postResponse.getBody();
+        KeycloakResponse response = getKeycloakResponseWithRetries(body);
         Instant now = Instant.now();
 
         return credential.toBuilder()
@@ -202,13 +176,69 @@ public class DirectKeycloakClientImpl implements KeycloakClient {
             Credential cred) throws UnirestException {
 
         if (cred.needsNewAccessToken()) {
-            // if needs a refresh
+            // if it needs a refresh
             log.info("Refreshing access token...");
             Credential refreshed = refreshToken(cred);
             CacheFile.writeCredentialToCacheFile(keycloakUrl, realm, username, refreshed);
             return refreshed;
         } else {
             return cred;
+        }
+    }
+
+    /**
+     * Tiny helper method that takes in a Unirest body and submits the request, and parses the response as a
+     * KeycloakResponse object. This helper method add retries (up to MAX_RETRIES) if the request fails for whatever
+     * reason.
+     *
+     * This method sleeps exponentially between retries to simulate an exponential backoff, starting at 200ms up to 102
+     * seconds
+     *
+     * @param body Unirest body to send request
+     *
+     * @return The KeycloakResponse object
+     * @throws UnirestException when all hope is lost to recover
+     */
+    private KeycloakResponse getKeycloakResponseWithRetries(MultipartBody body) throws UnirestException {
+
+        int retries = 0;
+
+        while (true) {
+            try {
+                HttpResponse<KeycloakResponse> postResponse = body.asObject(KeycloakResponse.class);
+                return postResponse.getBody();
+            } catch (UnirestException e) {
+                retries++;
+
+                if (retries > MAX_RETRIES) {
+                    // all hope is lost. Stop retrying
+                    throw e;
+                } else if (retries == MAX_RETRIES / 2) {
+                    // let the user know as she waits
+                    log.info("Having difficulty reaching {}. Retrying again...", body.getUrl());
+                }
+                sleepExponentially(retries);
+                log.debug("Retrying to reach: {}", body.getUrl());
+            }
+        }
+    }
+
+    /**
+     * Sleep starting from 100 milliseconds when retries = 0, and sleeping exponentially as the retries increase
+     *
+     * The math is millisecondsSleep = 100 * 2^(retries)
+     *
+     * @param retries number of retries attempted
+     */
+    private void sleepExponentially(int retries) {
+
+        long amountOfSleep = (long) (100 * Math.pow(2, retries));
+        log.debug("Sleeping for {} seconds", String.format("%.1f", amountOfSleep / 1000.0));
+
+        try {
+            Thread.sleep(amountOfSleep);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
     }
 }
