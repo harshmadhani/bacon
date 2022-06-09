@@ -38,13 +38,13 @@ public class ExternalArtifactDownloader {
     private ExternalArtifactDownloader() {
     }
 
-    public static File downloadExternalArtifact(GAV gav, Path targetRepoContents, boolean sourcesOptional) {
+    public static File downloadExternalArtifact(GAV gav, Path targetRepoContents, boolean optional) {
         File targetPath = targetPath(gav, targetRepoContents);
 
-        return downloadExternalArtifact(gav, targetPath, sourcesOptional);
+        return downloadExternalArtifact(gav, targetPath, optional);
     }
 
-    public static File downloadExternalArtifact(GAV gav, File targetPath, boolean sourcesOptional) {
+    public static File downloadExternalArtifact(GAV gav, File targetPath, boolean optional) {
         targetPath.toPath().getParent().toFile().mkdirs();
 
         String indyUrl = gav.isTemporary() ? Indy.getIndyTempUrl() : Indy.getIndyUrl();
@@ -53,8 +53,8 @@ public class ExternalArtifactDownloader {
         try {
             FileDownloadUtils.downloadTo(downloadUrl, targetPath);
         } catch (RuntimeException any) {
-            if (sourcesOptional && "sources".equals(gav.getClassifier()) || "javadoc".equals(gav.getClassifier())) {
-                log.warn("Unable to download sources for {}: {}", gav, any.getMessage());
+            if (optional) {
+                log.warn("Unable to download {}: {}", gav, any.getMessage());
             } else {
                 throw any;
             }

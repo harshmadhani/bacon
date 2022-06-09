@@ -312,7 +312,7 @@ public class RepoManager extends DeliverableManager<RepoGenerationData, Reposito
             List<String> excludeArtifacts = pigConfiguration.getFlow().getRepositoryGeneration().getExcludeArtifacts();
             RepositoryUtils.removeExcludedArtifacts(targetRepoContentsDir, excludeArtifacts);
         }
-        addMissingSources();
+        addMissingJars();
 
         RepositoryUtils.addCheckSums(targetRepoContentsDir);
         if (generationData.isIncludeMavenMetadata()) {
@@ -323,18 +323,21 @@ public class RepoManager extends DeliverableManager<RepoGenerationData, Reposito
         return result(targetTopLevelDirectory, targetZipPath);
     }
 
-    private void addMissingSources() {
+    private void addMissingJars() {
         Collection<GAV> gavs = RepoDescriptor.listGavs(targetRepoContentsDir);
 
         for (GAV gav : gavs) {
-            GAV sourceGav = gav.toSourcesJar();
-            GAV jarGav = gav.toJar();
-
-            File jarFile = ExternalArtifactDownloader.targetPath(jarGav, targetRepoContentsDir.toPath());
-            File sourceFile = ExternalArtifactDownloader.targetPath(sourceGav, targetRepoContentsDir.toPath());
-
-            if (jarFile.exists() && !sourceFile.exists()) {
-                ExternalArtifactDownloader.downloadExternalArtifact(sourceGav, sourceFile, true);
+            if (gav.isPom()) {
+                GAV jarGav = gav.toJar();
+                GAV sourceGav = gav.toSourcesJar();
+                File jarFile = ExternalArtifactDownloader.targetPath(jarGav, targetRepoContentsDir.toPath());
+                File sourceFile = ExternalArtifactDownloader.targetPath(sourceGav, targetRepoContentsDir.toPath());
+                if (!jarFile.exists()) {
+                    ExternalArtifactDownloader.downloadExternalArtifact(jarGav, jarFile, true);
+                }
+                if (jarFile.exists() && !sourceFile.exists()) {
+                    ExternalArtifactDownloader.downloadExternalArtifact(sourceGav, sourceFile, true);
+                }
             }
         }
     }

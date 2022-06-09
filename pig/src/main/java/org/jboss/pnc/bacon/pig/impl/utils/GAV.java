@@ -237,4 +237,8 @@ public class GAV {
     public static boolean isTempVersion(String v) {
         return v.contains("temporary-redhat") || v.matches(".*\\.t\\d{8}-\\d+-\\d+-redhat-\\d+");
     }
+
+    public boolean isPom() {
+        return isBlank(classifier) && packaging.equals("pom");
+    }
 }
