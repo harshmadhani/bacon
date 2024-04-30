@@ -87,6 +87,9 @@ public class DependencyGenerator {
     @CommandLine.Command(name = "generate", description = "Generates build config")
     public static class Generate extends DependencyGeneratorCommand {
 
+        @CommandLine.Parameters(description = "groupId:artifactId:version of the artifact to exclude")
+        private String[] excludedGavs;
+
         @Override
         public void run() {
             try {
@@ -107,6 +110,9 @@ public class DependencyGenerator {
                     config.getBuildConfigGeneratorConfig());
             // Analyze dependencies
             DependencyResult dependencies = dependencyResolver.resolve(projectDir, dominoConfig);
+            //Excluding GAVs from top level projects
+            log.info("There are {} dependencies to be excluded", excludedGavs.length);
+            dependencies.getTopLevelProjects().remove(excludedGavs);
             log.info("Analyzed project and found {} dependencies", dependencies.getCount());
             // Generate BCs
             // Generate project's names
